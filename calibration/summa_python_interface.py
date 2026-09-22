@@ -22,8 +22,8 @@ LIB_PATH = Path(__file__).parent / "libsumma.dylib"
 
 # Repo root, so master/config paths work regardless of cwd
 REPO_ROOT = Path(__file__).parent.parent
-MASTER_FILE = REPO_ROOT / "my_domain" / "settings" / "fileManager.txt"
-CONFIG_FILE = REPO_ROOT / "my_domain" / "settings" / "config_athabasca.toml"
+MASTER_FILE = REPO_ROOT / "test_coupled" / "settings" / "summa_fileManager.txt"
+CONFIG_FILE = REPO_ROOT / "test_coupled" / "settings" / "summa_config_test.toml"
 
 _lib = ctypes.CDLL(str(LIB_PATH))
 
@@ -55,7 +55,7 @@ _lib.summa_evaluate.argtypes = [
 _lib.summa_evaluate.restype = None
 
 
-def J(params, penalty=1e6):
+def J(params, penalty=-1e6):
     """
     Evaluate the SUMMA objective function for a given parameter set.
 

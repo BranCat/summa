@@ -1,19 +1,26 @@
-! ═══════════════════════════════════════════════════════════════
-!  summa_c_api.f90  —  C-bindable wrapper around evaluate_objective
-! ═══════════════════════════════════════════════════════════════
-!  SKELETON — adapt the param_name list and n_params to match the
-!  actual calibration parameters you and Martyn agree on.
+! ===============================================================
+!  summa_c_api.f90  --  C-bindable wrapper around evaluate_objective
+! ===============================================================
+!  Exposes SUMMA's objective function to C and, through ctypes, to
+!  Python:
 !
-!  Build (once integrated with the rest of the SUMMA build system,
-!  which provides the .o files for summa_simulation / nr_type / etc.):
+!    summa_evaluate(param_values, n, objective, err)  bind(C)
 !
-!    gfortran -shared -fPIC -O2 -o libsumma.dylib \
-!        summa_c_api.f90 <other required .o files> \
-!        $(nf-config --flibs) $(nc-config --flibs)
+!  Parameter values are paired with PARAM_NAMES below and applied
+!  through SUMMA's existing override path (param_override.f90), the
+!  same route used by the --param command-line flag. An unrecognised
+!  name returns err=20 rather than being silently ignored.
 !
-!  (exact link line depends on SUMMA's existing Makefile — reuse its
-!  object files rather than recompiling everything by hand)
-! ═══════════════════════════════════════════════════════════════
+!  The objective is KGE (get_kge in objfunc/metrics.f90): higher is
+!  better, 1 is perfect.
+!
+!  Build and test: see calibration/README.md ("make libsumma").
+!
+!  Limitation: PARAM_NAMES is fixed at compile time, so changing the
+!  calibration parameters requires a rebuild. evaluate_objective
+!  already accepts a name array, so passing names from Python is the
+!  natural next step.
+! ===============================================================
 
 module summa_c_api
 
@@ -23,8 +30,8 @@ module summa_c_api
 
   implicit none
 
-  ! TODO: confirm this list and order with Martyn — it must match
-  ! the parameter names SUMMA expects in param_name(:)
+  ! Calibration parameters. Names must match SUMMA's parameter tables
+  ! (localParamInfo.txt / basinParamInfo.txt); see calibration/README.md.
   integer, parameter :: N_PARAMS = 3
   character(len=64), parameter :: PARAM_NAMES(N_PARAMS) = &
       [character(len=64) :: "k_soil", "theta_sat", "vGn_n"]

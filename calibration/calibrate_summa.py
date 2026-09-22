@@ -30,7 +30,7 @@ def run_scipy_optimize():
 
     # NOTE: minimize() minimizes. If SUMMA's objective is something you
     # want to *maximize* (e.g. KGE, NSE), wrap it as `lambda p: -J(p)`.
-    result = minimize(J, x0=x0, bounds=bounds, method="Nelder-Mead")
+    result = minimize(lambda p: -J(p), x0=x0, bounds=bounds, method="Nelder-Mead")
 
     print("Optimal parameters:")
     for name, val in zip(PARAM_NAMES, result.x):
@@ -69,11 +69,11 @@ class spot_setup:
         return [0.0]
 
     def objectivefunction(self, simulation, evaluation, params=None):
-        # Pass the SUMMA-computed objective straight through.
-        # NOTE: SPOTPY's SCE-UA/DREAM/etc. algorithms maximize by
-        # default — flip the sign here if SUMMA's objective should be
-        # minimized (e.g. RMSE) rather than maximized (e.g. KGE).
-        return simulation[0]
+        # simulation[0] is KGE from SUMMA (higher is better, 1 is perfect).
+        # spotpy.algorithms.sceua sets optimization_direction="minimize",
+        # so return -KGE: minimising -KGE maximises KGE. Drop the minus
+        # sign only if you switch to a sampler that maximises.
+        return -simulation[0]
 
 
 def run_spotpy(n_runs=100):

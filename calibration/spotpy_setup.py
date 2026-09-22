@@ -21,9 +21,14 @@ class SummaSpotSetup:
         # TODO: confirm real bounds with Martyn — these are placeholders
         self.params = [
             spotpy.parameter.Uniform("k_soil", low=1e-7, high=1e-4),
-            spotpy.parameter.Uniform("theta_sat", low=0.3, high=0.6),
-            spotpy.parameter.Uniform("vGn_n", low=1.1, high=3.0),
+            spotpy.parameter.Uniform("theta_sat", low=0.35, high=0.65),
+            spotpy.parameter.Uniform("vGn_n", low=1.2, high=4.0),
         ]
+
+        # The vector SPOTPY passes is positional, and PARAM_NAMES assigns
+        # meaning by position on the Fortran side - so the two must agree.
+        assert [q.name for q in self.params] == list(PARAM_NAMES), \
+            "SPOTPY parameter order does not match PARAM_NAMES"
 
     def parameters(self):
         return spotpy.parameter.generate(self.params)
@@ -38,13 +43,14 @@ class SummaSpotSetup:
         return [0.0]
 
     def objectivefunction(self, simulation, evaluation, params=None):
-        # simulation[0] IS the objective (KGE) — return it directly.
-        # NOTE: confirm sign convention with Martyn. Your validated
-        # baseline value was -10.2181321285, which is unusually low
-        # for standard KGE (normally bounded around -inf to 1) — worth
-        # checking whether SPOTPY's algorithm here should minimize or
-        # maximize this value before running anything beyond a smoke test.
-        return simulation[0]
+        # simulation[0] is KGE, computed inside SUMMA by get_kge() in
+        # build/source/objfunc/metrics.f90. KGE is higher-is-better,
+        # with 1 the perfect score.
+        #
+        # spotpy.algorithms.sceua sets optimization_direction="minimize",
+        # so the sign is flipped here: minimising -KGE maximises KGE.
+        # If you switch to a sampler that maximises, drop the minus sign.
+        return -simulation[0]
 
 
 if __name__ == "__main__":

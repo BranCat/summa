@@ -1,7 +1,7 @@
 # SUMMA objective function: C wrapper, Python, SPOTPY
 
-Calls SUMMA (with mizuRoute routing in the same process) from Python as `J(params) -> float`,
-so any Python optimizer can drive it.
+Calls SUMMA (with mizuRoute routing in the same process) from Python as
+`J(params) -> float`, so any Python optimizer can drive it.
 
 | File | Purpose |
 |---|---|
@@ -10,52 +10,106 @@ so any Python optimizer can drive it.
 | `summa_python_interface.py` | ctypes wrapper exposing `J(params)` |
 | `spotpy_setup.py`, `calibrate_summa.py` | SPOTPY example |
 | `results_analysis.py` | routed flow at one segment vs observations (KGE, NSE, PBIAS + plot) |
+| `check_params.py`, `check_state.py` | interface checks (see Verification) |
 
 ## Build
+
+CMake is the supported path - it is what produces `libsumma.dylib`:
+
 ```bash
-cd build
-make            # summa.exe
-make libsumma   # libsumma.dylib (macOS); Linux needs -shared / .so
+cmake -B build/cmake_build -S build -DCMAKE_BUILD_TYPE=Release -DUSE_MIZUROUTE=ON
+cmake --build build/cmake_build -j
 ```
-`calibration/libsumma.dylib` is a symlink to the built library.
+
+`-DUSE_MIZUROUTE=ON` is required: without it the routing is not compiled in and
+the objective cannot be computed. This produces `build/cmake_build/libsumma.dylib`
+and `bin/summa.exe`. `calibration/libsumma.dylib` is a symlink to the former.
+
+The Makefile also has a `libsumma` target, but it only links object files from a
+prior `make` and the full Makefile build is currently not working on macOS. Use
+CMake.
+
+## The objective
+
+KGE, computed inside SUMMA by `get_kge()` in `build/source/objfunc/metrics.f90`,
+comparing routed flow at the gauge against the observations named in the config.
+**Higher is better; 1 is perfect.** The metric is selectable in the config file
+(`[objective] metric = "kge"`); `kgep`, `nse`, `rmse` and `mae` are also available.
+
+`summa_evaluate` and `J()` return the raw KGE. Samplers that minimise therefore
+need the sign flipped - `spotpy.algorithms.sceua` sets
+`optimization_direction = "minimize"`, so `objectivefunction()` returns `-KGE`.
 
 ## Tests (test case CAN_05BB001, included in `test_coupled/`)
-1. C call: `./test_summa_c_api` → objective **-10.2181321285**
-2. Python: `python calibration/summa_python_interface.py` → **-10.218132128510868**
-3. SPOTPY: `python calibration/calibrate_summa.py` → 5 iterations, ≈ -10.23 to -10.25
+
+Run from the repository root - the config files use repo-relative paths.
+
+1. C call: `./test_summa_c_api` -> objective **-10.2181321285**
+2. Python: `python calibration/summa_python_interface.py` -> **-10.218132128510868**
+3. SPOTPY: `python calibration/spotpy_setup.py` -> 5 Monte Carlo iterations
+
+Checks 1 and 2 should reproduce exactly. These are reference values from macOS
+(gfortran, Release); agreement to about six significant figures is what matters.
+
+## Verification
+
+`check_params.py` - each parameter independently changes the objective, so none
+is silently dropped:
+
+| Parameters | Objective |
+|---|---|
+| base `[7.5e-06, 0.55, 1.3]` | -10.218132128510868 |
+| `k_soil` 7.5e-05 | -10.22404957318226 |
+| `theta_sat` 0.35 | -10.234672609479931 |
+| `vGn_n` 2.0 | -10.232099916206575 |
+
+`check_state.py` - calling the same parameters twice in one process, with a
+different set in between, returns an identical value, so no state leaks between
+evaluations. Values also reproduce across separate processes.
+
+Parameters are applied by name through SUMMA's existing override path
+(`build/source/engine/param_override.f90`), the same route used by `--param`.
+An unrecognised name returns `err=20` rather than being ignored.
 
 ## Running a calibrated domain (no overrides)
+
 ```bash
 ./bin/summa.exe -m <fileManager.txt> -c <config.toml> -s <suffix>
 SUMMA_DOMAIN=/path/to/my_domain python calibration/results_analysis.py
 ```
 
-## Known limitations
-- `make libsumma` is macOS-only (`-dynamiclib`, `.dylib`).
-- `J()` always overrides its parameters, by design.
-- The `--param` CLI path is untested.
-- `seg_outlet = -9999` falls back to the largest-drainage-area reach.
-- SPOTPY bounds and the sign convention are placeholders.
-
 ## Test domains
 
-Two domains are included so the checks above can be re-run:
-
-- `test_coupled/` - the minimal coupled SUMMA + mizuRoute case used by
-  `test_summa_c_api.c` and `summa_python_interface.py`. Settings and inputs are
-  included, so the three checks run from a fresh clone.
-- `my_domain/` - the Athabasca test case (Athabasca_sedi_3): SUMMA and mizuRoute
+- `test_coupled/` - the minimal coupled SUMMA + mizuRoute case (CAN_05BB001) used
+  by `test_summa_c_api.c` and `summa_python_interface.py`. Settings and inputs are
+  included, so the checks above run from a fresh clone.
+- `my_domain/` - the Athabasca case (Athabasca_sedi_3): SUMMA and mizuRoute
   settings, river topology, and processed observed streamflow.
-  `settings/config_athabasca.toml` is the configuration used for the runs.
 
 Not included (too large for GitHub):
 
 - `my_domain/SUMMA_forcing_input/` - about 164 MB of monthly ERA5-derived forcing,
-  `Athabasca_sedi_3_ERA5_remapped_YYYY-MM-*.nc`, covering 2014-2024.
+  covering 2014-2024.
 - `my_domain/work/` and `test_coupled/work/` - model output, regenerated by a run.
 
-To re-run the Athabasca case, copy the forcing into `my_domain/SUMMA_forcing_input/`
-and check the paths in `settings/fileManager.txt`. Contact Frank Han for a copy.
+To run the Athabasca case, copy the forcing into `my_domain/SUMMA_forcing_input/`,
+check the paths in `settings/fileManager.txt`, and point `MASTER_FILE` /
+`CONFIG_FILE` in `summa_python_interface.py` at that domain. Contact Frank Han for
+a copy of the forcing.
 
-`results_analysis.py` looks for the domain at `<repo>/my_domain` by default; override
-it with the `SUMMA_DOMAIN` environment variable.
+`results_analysis.py` looks for the domain at `<repo>/my_domain` by default;
+override it with the `SUMMA_DOMAIN` environment variable.
+
+## Known limitations
+
+- `PARAM_NAMES` is fixed at compile time, so changing the calibration parameters
+  requires a rebuild. `evaluate_objective` already accepts a name array, so
+  passing names from Python is the natural next step.
+- `spotpy_setup.py` and `calibrate_summa.py` contain duplicate SPOTPY setup
+  classes; they should be consolidated.
+- SPOTPY parameter bounds are placeholders inside SUMMA's own limits, pending the
+  real calibration ranges.
+- The Makefile `libsumma` target is macOS-only and currently unusable; see Build.
+- The `--param` CLI path is untested.
+- Parameter overrides are spatially uniform - the same value is applied to every
+  HRU and GRU.
