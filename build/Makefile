@@ -292,6 +292,7 @@ SUMMA_DRIVER= \
 		summa_forcing.f90 \
 		summa_modelRun.f90 \
 		summa_writeOutput.f90 \
+		summa_c_api.f90 \
 		summa_driver.f90
 DRIVER = $(patsubst %, $(DRIVER_DIR)/%, $(SUMMA_DRIVER))
 
@@ -371,6 +372,9 @@ compile_summa: update_version
 # link routines
 link:
 	$(FC_EXE) -g *.o $(LIBRARIES) -o $(DRIVER__EX)
+
+libsumma:
+	$(FC_EXE) -dynamiclib -g $(filter-out %summa_driver.o, $(wildcard *.o)) $(LIBRARIES) -o libsumma.dylib
 
 # Remove object files
 clean:
