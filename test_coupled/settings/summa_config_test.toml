@@ -1,0 +1,41 @@
+[observations]
+obs_path = "test_coupled/mizuroute_inputs/"
+obs_file = "CAN_05BB001_daily_flow_observations.nc"
+vname_obsflow = "q_obs"
+
+[objective]
+metric = "kge"
+start_date = "1981-10-01"
+end_date = "1989-09-30"
+
+[mizuRoute]
+namelist_path = "external/mizuRoute/route/ancillary_data/"
+namelist_file = "param.nml.default"
+dt            = 3600
+methods       = "3"
+write_qbasin  = false
+write_Qreach  = true
+
+[hydrofabric]
+hfabric_path      = "test_coupled/mizuroute_inputs/"
+hfabric_file      = "topology.nc"
+dname_hru         = "hru"
+dname_seg         = "seg"
+varname_HRUid     = "hruId"
+varname_segId     = "segId"
+varname_hruSegId  = "hruToSegId"
+varname_downSegId = "downSegId"
+varname_area      = "area"
+varname_slope     = "slope"
+varname_length    = "length"
+seg_outlet        = -9999
+
+[remapping]
+remap_path     = "test_coupled/mizuroute_inputs/"
+remap_file     = "lumped_to_hru.nc"
+dname_hru      = "polyid"
+dname_data     = "data"
+vname_hruid    = "polyid"
+vname_weight   = "weight"
+vname_num_qhru = "nOverlaps"
+vname_qhruid   = "qhru_id"
