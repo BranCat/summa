@@ -10,7 +10,7 @@ Calls SUMMA (with mizuRoute routing in the same process) from Python as
 | `summa_python_interface.py` | ctypes wrapper exposing `J(params)` |
 | `spotpy_setup.py`, `calibrate_summa.py` | SPOTPY example |
 | `results_analysis.py` | routed flow at one segment vs observations (KGE, NSE, PBIAS + plot) |
-| `check_params.py`, `check_state.py` | interface checks (see Verification) |
+| `check_params.py`, `check_state.py`, `check_optimizer.py` | interface checks (see Verification) |
 
 ## Build
 
@@ -47,6 +47,7 @@ Run from the repository root - the config files use repo-relative paths.
 1. C call: `./test_summa_c_api` -> objective **-10.2181321285**
 2. Python: `python calibration/summa_python_interface.py` -> **-10.218132128510868**
 3. SPOTPY: `python calibration/spotpy_setup.py` -> 5 Monte Carlo iterations
+4. Optimiser wiring: `python calibration/check_optimizer.py` -> KGE near 1.0 (no model run)
 
 Checks 1 and 2 should reproduce exactly. These are reference values from macOS
 (gfortran, Release); agreement to about six significant figures is what matters.
@@ -66,6 +67,15 @@ is silently dropped:
 `check_state.py` - calling the same parameters twice in one process, with a
 different set in between, returns an identical value, so no state leaks between
 evaluations. Values also reproduce across separate processes.
+
+**The optimiser searches in the right direction** (`check_optimizer.py`) - SCE-UA
+against an analytic objective recovers the known optimum (KGE 0.998) and each
+parameter converges to its own target, which also confirms the ordering between
+SPOTPY and `PARAM_NAMES`.
+
+**The CLI and library paths agree** - `summa.exe` with
+`--param k_soil 7.5e-06 --param theta_sat 0.55 --param vGn_n 1.3` produces output
+bit-identical to the `J([7.5e-06, 0.55, 1.3])` run across all shared variables.
 
 Parameters are applied by name through SUMMA's existing override path
 (`build/source/engine/param_override.f90`), the same route used by `--param`.
@@ -110,6 +120,5 @@ override it with the `SUMMA_DOMAIN` environment variable.
 - SPOTPY parameter bounds are placeholders inside SUMMA's own limits, pending the
   real calibration ranges.
 - The Makefile `libsumma` target is macOS-only and currently unusable; see Build.
-- The `--param` CLI path is untested.
 - Parameter overrides are spatially uniform - the same value is applied to every
   HRU and GRU.
